@@ -1,34 +1,26 @@
-const HideLockedCombatSkills = 'hide-locked-combat-skills';
-const HideLockedNonCombatSkills = 'hide-locked-non-combat-skills';
+const SkillCategories = [ 'Combat', 'Passive', 'Non-Combat' ];
+const storagePrefix = 'hide-locked-skills';
 
 export function setup({ onCharacterLoaded, characterStorage }) {
     onCharacterLoaded(() => {
-        const lockedCombatSkillsHidden = characterStorage.getItem(HideLockedCombatSkills);
-        const lockedNonCombatSkillsHidden = characterStorage.getItem(HideLockedNonCombatSkills);
+        const hiddenCategories = SkillCategories.reduce((obj, catId) =>
+            ({ ...obj, [catId]: characterStorage.getItem(`${storagePrefix}-${catId}`) || false }), {});
 
-        const sidebarCategories = sidebar.categories();
-        const categoryCombat = sidebarCategories.find(c => c.id === 'Combat');
-        const categoryNonCombat = sidebarCategories.find(c => c.id === 'Non-Combat');
-        const toggleLockedCombatSkills = hidden => toggleLockedSkills(categoryCombat.items(), hidden);
-        const toggleLockedNonCombatSkills = hidden => toggleLockedSkills(categoryNonCombat.items(), hidden);
+        const sidebarSkillCategories = sidebar.categories().reduce((obj, cat) =>
+            SkillCategories.includes(cat.id) ? { ...obj, [cat.id]: cat } : obj, {});
 
-        ui.create(Hider({
-            hidden: lockedCombatSkillsHidden,
-            onToggle: hidden => {
-                characterStorage.setItem(HideLockedCombatSkills, hidden);
-                toggleLockedCombatSkills(hidden);
-            }
-        }), categoryCombat.categoryEl);
-        ui.create(Hider({
-            hidden: lockedNonCombatSkillsHidden,
-            onToggle: hidden => {
-                characterStorage.setItem(HideLockedNonCombatSkills, hidden);
-                toggleLockedNonCombatSkills(hidden);
-            }
-        }), categoryNonCombat.categoryEl);
+        const toggleLockedSkills = (catId, doHide) => toggleLockedSkillItems(sidebarSkillCategories[catId].items(), doHide);
 
-        toggleLockedCombatSkills(lockedCombatSkillsHidden);
-        toggleLockedNonCombatSkills(lockedNonCombatSkillsHidden);
+        Object.keys(sidebarSkillCategories).forEach(catId => {
+            ui.create(Hider({
+                hidden: hiddenCategories[catId] || false,
+                onToggle: doHide => {
+                    characterStorage.setItem(`${storagePrefix}-${catId}`, doHide);
+                    toggleLockedSkills(catId, doHide);
+                }
+            }), sidebarSkillCategories[catId].categoryEl);
+            toggleLockedSkills(catId, hiddenCategories[catId] || false);
+        });
     });
 }
 
@@ -38,7 +30,7 @@ function lockedSkillItems(categoryItems) {
         charSkills.some(skill => skill[0] === item.id && skill[1]._unlocked === false));
 }
 
-function toggleLockedSkills(categoryItems, hide) {
+function toggleLockedSkillItems(categoryItems, hide) {
     lockedSkillItems(categoryItems).forEach(item => {
         if (hide) {
             item.rootEl.classList.add('hidden');
